@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vídeo para PDF</title>
+<style>
+:root{--bg:#f6f6f4;--card:#fff;--tx:#1d1d1b;--mut:#6b6b66;--bd:#e2e2dc;--ac:#d9622b;--act:#fff;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141413;--card:#1f1f1d;--tx:#f0efe9;--mut:#9a9992;--bd:#33332f;--ac:#e8794a;--act:#141413;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#141413;--card:#1f1f1d;--tx:#f0efe9;--mut:#9a9992;--bd:#33332f;--ac:#e8794a;--act:#141413;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:560px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:22px;margin:0 0 2px}
+.sub{color:var(--mut);margin:0 0 16px;font-size:14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:12px}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);margin:0 0 10px}
+.btn{display:block;width:100%;border:0;border-radius:10px;padding:13px;font:inherit;font-weight:600;background:var(--ac);color:var(--act);text-align:center;cursor:pointer}
+.btn.alt{background:transparent;color:var(--tx);border:1px solid var(--bd)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+input[type=file]{display:none}
+.vwrap{position:relative;margin:10px auto 0;display:none;width:100%}
+video{width:100%;display:block;border-radius:10px;background:#000}
+.roi{position:absolute;border:2px solid var(--ac);background:rgba(217,98,43,.22);pointer-events:none;border-radius:3px}
+.info{color:var(--mut);font-size:13px;margin-top:8px}
+.hint{color:var(--mut);font-size:13px;margin:6px 0 0}
+label{display:block;font-size:14px;margin:12px 0 4px}
+.card label:first-of-type{margin-top:0}
+input[type=number],select{width:100%;padding:10px;border-radius:9px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font:inherit}
+input[type=range]{width:100%;accent-color:var(--ac)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{border:1px solid var(--bd);background:transparent;color:var(--tx);border-radius:99px;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer}
+.chip.on{background:var(--ac);color:var(--act);border-color:var(--ac)}
+.chk{display:flex;align-items:center;gap:8px;margin-top:14px}
+.sum{font-weight:600;margin:4px 0 8px}
+.warn{color:var(--ac);font-size:13px;margin:0 0 10px}
+.bar{height:8px;border-radius:99px;background:var(--bd);overflow:hidden;margin:12px 0 6px;display:none}
+.bar i{display:block;height:100%;width:0;background:var(--ac);transition:width .15s}
+#st{font-size:14px;color:var(--mut);min-height:20px}
+.gap{height:8px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <h1>🎞️ Vídeo para PDF</h1>
+  <p class="sub">Cria uma página no PDF sempre que a página do vídeo mudar. Tudo roda no seu aparelho.</p>
+
+  <div class="card">
+    <label class="btn" for="file" id="pick">Escolher vídeo</label>
+    <input type="file" id="file" accept="video/*">
+    <div class="vwrap" id="vw"><video id="v" controls muted playsinline preload="auto"></video><div class="roi" id="roi"></div></div>
+    <div class="info" id="meta"></div>
+  </div>
+
+  <div class="card">
+    <h2>Detectar mudança de página</h2>
+    <label for="mode">Onde olhar</label>
+    <select id="mode">
+      <option value="tr" selected>Canto superior direito (contador de página)</option>
+      <option value="tl">Canto superior esquerdo</option>
+      <option value="br">Canto inferior direito</option>
+      <option value="bl">Canto inferior esquerdo</option>
+      <option value="full">Frame inteiro</option>
+      <option value="off">Desligado (usar todos os frames)</option>
+    </select>
+    <div id="zone">
+      <label for="aw">Largura da área: <b id="awv">25</b>%</label>
+      <input type="range" id="aw" min="5" max="100" value="25">
+      <label for="ah">Altura da área: <b id="ahv">10</b>%</label>
+      <input type="range" id="ah" min="3" max="100" value="10">
+      <p class="hint">A caixa laranja sobre o vídeo mostra a área analisada. Ajuste para cobrir só o contador.</p>
+    </div>
+    <div id="sensw">
+      <label for="sens">Sensibilidade: <b id="sv">80</b>%</label>
+      <input type="range" id="sens" min="1" max="100" value="80">
+      <label for="which">Frame usado em cada página</label>
+      <select id="which">
+        <option value="last" selected>Último (mais estável)</option>
+        <option value="first">Primeiro (assim que muda)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Captura e PDF</h2>
+    <label for="fps">FPS de análise (frames por segundo)</label>
+    <input type="number" id="fps" value="5" min="0.1" max="60" step="0.1" inputmode="decimal">
+    <div class="chips" id="chips"></div>
+
+    <div class="row">
+      <div><label for="from">Início (s)</label><input type="number" id="from" value="0" min="0" step="0.1" inputmode="decimal"></div>
+      <div><label for="to">Fim (s)</label><input type="number" id="to" value="0" min="0" step="0.1" inputmode="decimal"></div>
+    </div>
+
+    <label for="page">Tamanho da página</label>
+    <select id="page">
+      <option value="fit">Ajustar ao frame</option>
+      <option value="a4">A4</option>
+      <option value="letter">Carta</option>
+    </select>
+
+    <label for="maxw">Resolução máxima</label>
+    <select id="maxw">
+      <option value="0">Original</option>
+      <option value="1920">1920 px</option>
+      <option value="1280" selected>1280 px</option>
+      <option value="854">854 px</option>
+      <option value="640">640 px</option>
+    </select>
+
+    <label for="qual">Qualidade da imagem: <b id="qv">80</b>%</label>
+    <input type="range" id="qual" min="40" max="100" value="80">
+
+    <div class="chk"><input type="checkbox" id="ts" checked><label for="ts" style="margin:0">Mostrar número da página e tempo do vídeo</label></div>
+  </div>
+
+  <div class="sum" id="sum"></div>
+  <div class="warn" id="warn" hidden></div>
+  <button class="btn" id="go" disabled>Converter para PDF</button>
+  <div class="gap"></div>
+  <button class="btn alt" id="stop" hidden>Cancelar</button>
+  <div class="bar" id="bar"><i id="fill"></i></div>
+  <div id="st"></div>
+  <button class="btn" id="dl" hidden>Baixar PDF</button>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const v = $('v');
+let url = null, dur = 0, name = 'video', stop = false, pdfBlob = null;
+const st = t => { $('st').textContent = t; };
+const fmtT = s => Math.floor(s / 60) + ':' + (s % 60).toFixed(1).padStart(4, '0');
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+[1, 2, 5, 10, 15, 24, 30].forEach(f => {
+  const b = document.createElement('button');
+  b.className = 'chip'; b.textContent = f + ' fps'; b.dataset.f = f;
+  b.onclick = () => { $('fps').value = f; upd(); };
+  $('chips').appendChild(b);
+});
+
+function count() {
+  const f = +$('fps').value || 1, a = +$('from').value || 0;
+  const b = Math.min(+$('to').value || dur, dur);
+  return Math.max(1, Math.floor((b - a) * f + 1e-6));
+}
+
+function roi() {
+  const m = $('mode').value, w = +$('aw').value, h = +$('ah').value, r = $('roi');
+  $('zone').hidden = m === 'off' || m === 'full';
+  $('sensw').hidden = m === 'off';
+  if (m === 'off') { r.style.display = 'none'; return; }
+  r.style.display = 'block';
+  r.style.cssText += m === 'full' ? ';inset:0;width:auto;height:auto'
+    : ';inset:auto;width:' + w + '%;height:' + h + '%;' + (m[0] === 't' ? 'top:0;' : 'bottom:0;') + (m[1] === 'r' ? 'right:0;' : 'left:0;');
+}
+
+function upd() {
+  document.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', +c.dataset.f === +$('fps').value));
+  $('qv').textContent = $('qual').value; $('sv').textContent = $('sens').value;
+  $('awv').textContent = $('aw').value; $('ahv').textContent = $('ah').value;
+  roi();
+  if (!dur) { $('sum').textContent = ''; $('warn').hidden = true; return; }
+  const n = count(), off = $('mode').value === 'off';
+  $('sum').textContent = off ? '≈ ' + n + ' páginas' : 'Vai analisar ≈ ' + n + ' frames; só as mudanças viram página';
+  let w = '';
+  if (!off && +$('fps').value < 3) w = 'Dica: com o filtro ligado, use 5 a 10 fps para não pular páginas que passam rápido.';
+  else if (n > (off ? 400 : 3000)) w = off ? 'Muitas páginas: em celulares isso pode travar.' : 'Muitos frames para analisar, pode demorar.';
+  $('warn').hidden = !w; $('warn').textContent = w;
+}
+['fps', 'from', 'to', 'qual', 'mode', 'aw', 'ah', 'sens'].forEach(i => $(i).addEventListener('input', upd));
+
+$('file').onchange = e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  if (url) URL.revokeObjectURL(url);
+  url = URL.createObjectURL(f);
+  name = f.name.replace(/\.[^.]+$/, '') || 'video';
+  pdfBlob = null; $('dl').hidden = true; $('go').disabled = true; dur = 0;
+  $('vw').style.display = 'block'; v.src = url;
+  $('pick').textContent = 'Trocar vídeo';
+  st('Carregando vídeo…');
+};
+v.onloadedmetadata = () => {
+  if (!isFinite(v.duration) || !v.videoWidth) { st('Não consegui ler a duração deste vídeo. Tente outro arquivo (MP4 ou WebM).'); return; }
+  dur = v.duration;
+  $('vw').style.width = 'min(100%, ' + Math.round(260 * v.videoWidth / v.videoHeight) + 'px)';
+  $('from').value = 0; $('to').value = dur.toFixed(1);
+  $('meta').textContent = name + ' · ' + v.videoWidth + '×' + v.videoHeight + ' · ' + fmtT(dur);
+  $('go').disabled = false; st(''); upd();
+};
+v.onerror = () => st('Não consegui abrir este vídeo. Tente MP4 ou WebM.');
+
+async function seek(t) {
+  if (v.readyState < 2) await Promise.race([new Promise(r => v.addEventListener('loadeddata', r, { once: true })), wait(3000)]);
+  if (Math.abs(v.currentTime - t) > 0.001) {
+    await new Promise(res => {
+      let done = false;
+      const fin = () => { if (!done) { done = true; v.removeEventListener('seeked', fin); res(); } };
+      v.addEventListener('seeked', fin);
+      setTimeout(fin, 4000);
+      v.currentTime = t;
+    });
+  }
+  await wait(40); // dá tempo do navegador pintar o frame novo
+}
+
+// "assinatura" em tons de cinza da área analisada
+const sc = document.createElement('canvas'), sx = sc.getContext('2d', { willReadFrequently: true });
+function sig(cv, [x, y, w, h]) {
+  const k = Math.min(1, 160 / w), tw = Math.max(8, Math.round(w * k)), th = Math.max(8, Math.round(h * k));
+  sc.width = tw; sc.height = th;
+  sx.drawImage(cv, x, y, w, h, 0, 0, tw, th);
+  const d = sx.getImageData(0, 0, tw, th).data, g = new Uint8Array(tw * th);
+  for (let i = 0; i < g.length; i++) g[i] = d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11;
+  return g;
+}
+function changed(a, b, thr) {
+  if (!a || a.length !== b.length) return true;
+  let c = 0;
+  for (let i = 0; i < a.length; i++) if (Math.abs(a[i] - b[i]) > 40) c++;
+  return c / a.length > thr;
+}
+
+function busy(b) {
+  $('go').disabled = b; $('stop').hidden = !b;
+  $('bar').style.display = b ? 'block' : 'none';
+  ['file', 'fps', 'from', 'to', 'page', 'maxw', 'qual', 'ts', 'mode', 'aw', 'ah', 'sens', 'which'].forEach(i => $(i).disabled = b);
+}
+$('stop').onclick = () => { stop = true; };
+
+$('go').onclick = async () => {
+  if (!window.jspdf) { st('A biblioteca de PDF não carregou. Recarregue a página.'); return; }
+  const { jsPDF } = window.jspdf;
+  v.pause(); stop = false; pdfBlob = null; $('dl').hidden = true; busy(true);
+  try {
+    const f = +$('fps').value || 1, a = +$('from').value || 0, n = count();
+    const vw = v.videoWidth, vh = v.videoHeight;
+    const mw = +$('maxw').value || vw, k = Math.min(1, mw / vw);
+    const cw = Math.round(vw * k), ch = Math.round(vh * k);
+    const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+    const ctx = cv.getContext('2d');
+    const q = +$('qual').value / 100, fmt = $('page').value, cap = $('ts').checked;
+    const mode = $('mode').value, last = $('which').value === 'last';
+    const thr = 0.0005 + (100 - +$('sens').value) / 100 * 0.04;
+    let rc = [0, 0, cw, ch];
+    if (mode !== 'full' && mode !== 'off') {
+      const w = Math.max(8, Math.round(cw * $('aw').value / 100)), h = Math.max(8, Math.round(ch * $('ah').value / 100));
+      rc = [mode[1] === 'r' ? cw - w : 0, mode[0] === 't' ? 0 : ch - h, w, h];
+    }
+    const m = fmt === 'fit' ? 0 : 28, capH = cap ? 20 : 0;
+    let pw, ph;
+    if (fmt === 'fit') { pw = cw * 0.75; ph = ch * 0.75 + capH; }
+    else { [pw, ph] = fmt === 'a4' ? [595.28, 841.89] : [612, 792]; if (vw > vh) [pw, ph] = [ph, pw]; }
+    const ori = pw > ph ? 'l' : 'p';
+    const aw = pw - 2 * m, ah = ph - 2 * m - capH;
+    const r = fmt === 'fit' ? 0.75 : Math.min(aw / cw, ah / ch);
+    const iw = cw * r, ih = ch * r, x = (pw - iw) / 2, y = m + (ah - ih) / 2;
+
+    let doc = null, pages = 0, ref = null, pend = null;
+    const enc = () => cv.toDataURL('image/jpeg', q);
+    const add = (img, t) => {
+      if (!doc) doc = new jsPDF({ orientation: ori, unit: 'pt', format: [pw, ph] });
+      else doc.addPage([pw, ph], ori);
+      doc.addImage(img, 'JPEG', x, y, iw, ih, undefined, 'FAST');
+      if (cap) {
+        doc.setFontSize(9); doc.setTextColor(90);
+        doc.text('Página ' + (pages + 1) + ' · ' + fmtT(t), pw / 2, ph - m - 6, { align: 'center' });
+      }
+      pages++;
+    };
+
+    for (let i = 0; i < n; i++) {
+      if (stop) break;
+      const t = a + i / f;
+      await seek(Math.min(t, Math.max(0, dur - 0.05)));
+      ctx.drawImage(v, 0, 0, cw, ch);
+      if (mode === 'off') add(enc(), t);
+      else {
+        const s = sig(cv, rc), isNew = changed(ref, s, thr);
+        if (isNew) {
+          ref = s;
+          if (pend) { add(pend.img, pend.t); pend = null; }
+          if (last) pend = { img: enc(), t }; else add(enc(), t);
+        } else if (last) pend = { img: enc(), t };
+      }
+      $('fill').style.width = ((i + 1) / n * 100) + '%';
+      st('Frame ' + (i + 1) + ' de ' + n + ' · ' + (pages + (pend ? 1 : 0)) + ' páginas');
+    }
+    if (pend) add(pend.img, pend.t);
+    if (!doc) st('Cancelado.');
+    else {
+      pdfBlob = doc.output('blob');
+      st((stop ? 'Cancelado, PDF parcial' : 'Pronto!') + ' · ' + pages + ' páginas · ' + (pdfBlob.size / 1048576).toFixed(1) + ' MB');
+      $('dl').hidden = false;
+    }
+  } catch (e) {
+    st('Algo deu errado (talvez pouca memória). Tente reduzir o FPS ou a resolução.');
+  }
+  busy(false);
+};
+
+$('dl').onclick = async () => {
+  if (!pdfBlob) return;
+  const fn = name + '.pdf';
+  let d = null;
+  try { d = window.claude ? await window.claude.use('downloads') : null; } catch (e) {}
+  if (d) {
+    try { await d.save({ filename: fn, data: pdfBlob }); }
+    catch (e) { if (!e || e.code !== 'declined') st('Não foi possível salvar o arquivo.'); }
+  } else {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(pdfBlob); a.download = fn;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+};
+upd();
+</script>
+</body>
+</html>
